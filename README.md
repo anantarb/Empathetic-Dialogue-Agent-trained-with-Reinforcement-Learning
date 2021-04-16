@@ -1,4 +1,4 @@
-# NLP Lab Course 2021: VDA Project (IDP)
+# NLP Lab Course 2021: VDA Project
 This is the repository for the NLP Lab Course 2021: Virtual Dietary Advisor.
 
 ## 1 Contributing
