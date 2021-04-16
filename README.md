@@ -10,4 +10,5 @@ The repository structure is as follows:
  * `tests/`: Any tests to ensure or debug program functionality go here
  * `utils/`: All the helper classes or functions go here.
  * `env.yaml` and `env.py`: Add any environment variables (such as paths to dataset files etc.) to the `env.yaml` file. To allow quick usage, load them in `env.py` and import them in your script via `from env import VARIABLE_NAME`
+ * `requirements.txt`: Add any python packages that are required to run this project in `requirements.txt`
  * `.gitignore`: Add any files and folders that should not be versioned to the `.gitignore`. Typically, datasets, binary files and the like should be ignored by git
