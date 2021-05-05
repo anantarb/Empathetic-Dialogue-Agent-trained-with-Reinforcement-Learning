@@ -122,6 +122,8 @@ venv.bak/
 
 #Datasets
 /datasets
+/gpt-2
+/checkpoint
 
 # mypy
 .mypy_cache/
