@@ -23,7 +23,7 @@ except:
     pass
 
 from models import model, encoder
-from data.load_dataset import process_training_data
+from data.load_dataset import process_training_data, Batch_Sampler
 from models.accumulate import AccumulatingOptimizer
 
 assert tf.__version__ < '2.0.0', "gpt-2-simple currently does not support " \
@@ -64,7 +64,8 @@ def get_available_gpus():
 
 
 def finetune(sess,
-             dataset,
+             train_dataset,
+             val_dataset,
              steps=-1,
              model_name='124M',
              model_dir='models',
@@ -73,11 +74,11 @@ def finetune(sess,
              accumulate_gradients=5,
              input_maxlen=100,
              history_len=4,
+             patience=20,
              restore_from='latest',
              run_name='run1',
              checkpoint_dir='checkpoint',
              multi_gpu=False,
-             save_every=1000,
              print_every=1,
              max_checkpoints=1,
              optimizer='adam',
@@ -132,8 +133,8 @@ def finetune(sess,
         opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
     opt = AccumulatingOptimizer(
-          opt=opt,
-          var_list=train_vars)
+            opt=opt,
+            var_list=train_vars)
     opt_reset = opt.reset()
     opt_compute = opt.compute_gradients(loss)
     opt_apply = opt.apply_gradients()
@@ -162,8 +163,15 @@ def finetune(sess,
     saver.restore(sess, ckpt)
 
     print('Loading dataset...')
-    data = process_training_data(dataset, enc, maxlen=input_maxlen, history_len=history_len, reactonly=False)
-    print('dataset has', len(data), 'training samples')
+    train_data = process_training_data(train_dataset, enc, maxlen=input_maxlen, history_len=history_len, reactonly=False)
+    print('Training dataset has', len(train_data), 'training samples')
+    train_batch_sampler = Batch_Sampler(train_data, batch_size, shuffle=True)
+
+    val_data = process_training_data(val_dataset, enc, maxlen=input_maxlen, history_len=history_len, reactonly=False)
+    print('Validation dataset has', len(val_data), 'validation samples')
+    val_batch_sampler = Batch_Sampler(val_data, batch_size, shuffle=False)
+    
+
     print('Training...')
 
     counter = 1
@@ -188,8 +196,17 @@ def finetune(sess,
         with open(counter_path, 'w') as fp:
             fp.write(str(counter-1) + '\n')
 
-    def sample_batch():
-        return random.sample(data, batch_size)
+    def validate():
+
+        val_loss = 0
+        n_examples = 0
+        for i in range(len(val_data) // batch_size):
+            loss = sess.run(loss, feed_dict={context: val_batch_sampler.sample()})
+            val_loss += loss
+            n_examples += 1
+
+        return val_loss / n_examples
+
 
     if overwrite and restore_from == 'latest':
         for file in files:
@@ -204,35 +221,44 @@ def finetune(sess,
         steps = int(steps)
     
     try:
+        best_loss = float("+inf")
         while True:
             if steps > 0 and counter == (counter_base + steps):
-                save()
                 return
-            if (counter - 1) % save_every == 0 and counter > 1:
-                save()
 
+            # Training
             sess.run(opt_reset)
             for _ in range(accumulate_gradients):
-                sess.run(
-                   opt_compute, feed_dict={context: sample_batch()})
+                sess.run(opt_compute, feed_dict={context: train_batch_sampler.sample()})
             (v_loss, v_summary) = sess.run((opt_apply, summary_loss))
-
             summary_log.add_summary(v_summary, counter)
+
+            # Validating
+            avg_val_loss = validate()
+            summary_val = tf.compat.v1.summary.scalar('avg_val_loss', avg_val_loss)
+            summary_log.add_summary(summary_val, counter)
+            
+            if avg_val_loss < best_loss:
+                best_loss = avg_val_loss
+                best_loss_step = counter
+                save()
+
+            if counter - best_loss_step >= patience:
+                break
 
             if counter % print_every == 0:
                 avg_loss = (avg_loss[0] * 0.99 + v_loss,
                             avg_loss[1] * 0.99 + 1.0)
 
                 print(
-                    '[{counter} | {time:2.2f}] loss={loss:2.2f} avg={avg:2.2f}'
+                    '[{counter} | {time:2.2f}] loss={loss:2.2f} avg={avg:2.2f} avg_val_loss={avg_val_loss:2.2f}'
                     .format(
                         counter=counter,
                         time=time.time() - start_time,
                         loss=v_loss,
-                        avg=avg_loss[0] / avg_loss[1]))
+                        avg=avg_loss[0] / avg_loss[1], avg_val_loss))
 
             counter += 1
     except KeyboardInterrupt:
         print('interrupted')
-        save()
 

@@ -1,4 +1,4 @@
-
+import random
 import numpy as np
 
 
@@ -90,6 +90,21 @@ def process_training_data(source_path, encoder, maxlen=100, history_len=1, react
     
     return data
 
+class Batch_Sampler(object):
 
+    def __init__(self, data, batch_size, shuffle=False):
+        self.data = data
+        self.total_size = len(data)
+        self.batch_size = batch_size
+        self.current_index = 0
+        if shuffle:
+            random.shuffle(data)
+
+    def sample(self):
+        if self.current_index + self.batch_size > self.total_size:
+            self.current_index = 0
+        prev_index = self.current_index
+        self.current_index = self.current_index + self.batch_size
+        return self.data[prev_index:self.current_index]
 
 
