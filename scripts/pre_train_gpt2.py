@@ -201,8 +201,8 @@ def finetune(sess,
         val_loss = 0
         n_examples = 0
         for i in range(len(val_data) // batch_size):
-            loss = sess.run(loss, feed_dict={context: val_batch_sampler.sample()})
-            val_loss += loss
+            (loss_v) = sess.run(loss, feed_dict={context: val_batch_sampler.sample()})
+            val_loss += loss_v
             n_examples += 1
 
         return val_loss / n_examples
@@ -235,17 +235,7 @@ def finetune(sess,
 
             # Validating
             avg_val_loss = validate()
-            summary_val = tf.compat.v1.summary.scalar('avg_val_loss', avg_val_loss)
-            summary_log.add_summary(summary_val, counter)
             
-            if avg_val_loss < best_loss:
-                best_loss = avg_val_loss
-                best_loss_step = counter
-                save()
-
-            if counter - best_loss_step >= patience:
-                break
-
             if counter % print_every == 0:
                 avg_loss = (avg_loss[0] * 0.99 + v_loss,
                             avg_loss[1] * 0.99 + 1.0)
@@ -256,7 +246,15 @@ def finetune(sess,
                         counter=counter,
                         time=time.time() - start_time,
                         loss=v_loss,
-                        avg=avg_loss[0] / avg_loss[1], avg_val_loss))
+                        avg=avg_loss[0] / avg_loss[1], avg_val_loss=avg_val_loss))
+            
+            if avg_val_loss < best_loss:
+                best_loss = avg_val_loss
+                best_loss_step = counter
+                save()
+
+            if counter - best_loss_step >= patience:
+                break
 
             counter += 1
     except KeyboardInterrupt:
