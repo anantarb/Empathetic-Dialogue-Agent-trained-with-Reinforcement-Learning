@@ -125,6 +125,10 @@ venv.bak/
 /gpt-2
 /checkpoint
 
+# annotation files
+/scripts/results
+/data/test_comparisons_output.json
+
 # mypy
 .mypy_cache/
 .dmypy.json
