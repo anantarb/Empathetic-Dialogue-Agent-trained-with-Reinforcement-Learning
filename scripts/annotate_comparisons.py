@@ -2,8 +2,8 @@ import json
 import random
 import time
 import os
-import sys
-import csv
+import sys, getopt
+
 from itertools import combinations
 from pathlib import Path
 from typing import Text
@@ -82,23 +82,46 @@ def show_instructions():
           f"\nThe next dialog and response pair will automatically be shown to you after you hit enter.")
 
 
-if __name__ == '__main__':
+def annotate(inputfile='', outputfile=''):
+    continue_old_file = True
+    if outputfile == '':
+        continue_old_file = False
+    print ('Input file is "', inputfile)
+    print ('Output file is "', outputfile)
+
     # CONFIGURATION
     project_dir = Path(__file__).resolve().parent
-    data_filepath = project_dir.joinpath('../data/test_comparisons_output.json')
-    results_dir = project_dir.joinpath('results')
+    if inputfile == "":
+        data_filepath = project_dir.joinpath('../data/test_comparisons_output.json')
+    else:
+        data_filepath = project_dir.joinpath(inputfile)
 
     num_comparisons_per_dialog_length = 10  # create n comparisons per dialog length
-    size_of_each_dialog_line = 80  # specify printing format
+    size_of_each_dialog_line = 50  # specify printing format
     space_between_dialogs = 10  # specify printing format
     random.seed(7)
     # CONFIGURATION END
 
+    results_dir = project_dir.joinpath('results')
+
     # setup
     # file management
-    create_missing_directories(results_dir)
-    current_timestamp = time.strftime("%d-%m-%Y-%H-%M", time.gmtime())
-    results_filepath = results_dir.joinpath('%s_%s.json' % ('annotated_samples', current_timestamp))
+    if not continue_old_file:
+        create_missing_directories(results_dir)
+        current_timestamp = time.strftime("%d-%m-%Y-%H-%M", time.gmtime())
+        outputfile = '%s_%s.json' % ('annotated_samples', current_timestamp)
+
+    results_filepath = results_dir.joinpath(outputfile)
+
+    starting_sample = 0
+
+    if continue_old_file:
+        # load data from json file
+        with open(results_filepath) as f:
+            annotated_data = json.load(f)
+            starting_sample = annotated_data['counter']
+
+
     # setup end
 
     # read dialog data
@@ -125,22 +148,24 @@ if __name__ == '__main__':
     while True:
         start_or_exit = input(f"\nIf you are ready, type {bcolors.OKGREEN}start{bcolors.ENDC}.\n"
                               f"If you want to quit, type {bcolors.FAIL}exit{bcolors.ENDC}.\n"
-                              f"Your input: ")
+                              f"Output in file %s.\n" 
+                              f"Your input: "% outputfile)
         if start_or_exit == 'exit':
             sys.exit(0)
         if start_or_exit == 'start':
+            print(f'{bcolors.OKGREEN}-{bcolors.ENDC}'*(2*size_of_each_dialog_line+space_between_dialogs))
             break
 
     exit_typed = False
 
 
     # start comparisons
-    data = {}
-    data['data'] = []
-                    
-    print(len(parsed_comparisons))
+    if not continue_old_file:
+        annotated_data = {}
+        annotated_data['data'] = []
+        annotated_data['counter'] = 0
 
-    for i in range(len(parsed_comparisons)):  # create n comparisons
+    for i in range(starting_sample,len(parsed_comparisons)):  # create n comparisons
         print("This is the dialog history:\n"+'-'*(2*size_of_each_dialog_line+space_between_dialogs))
 
         query = parsed_comparisons[i]["Q"]
@@ -149,6 +174,8 @@ if __name__ == '__main__':
 
         col_query = format_context(query)
 
+        state_str = ("[Sample {current} of {all}]").format(current=str(i+1) , all=str(len(parsed_comparisons)))
+        print(f"{bcolors.TEXT}%s{bcolors.ENDC}" % state_str)
         print((col_query.replace('<SOC>','\n'))+'\n'+'-'*(2*size_of_each_dialog_line+space_between_dialogs))
         print('\nWhich next turn is better?\n' + '-'*(2*size_of_each_dialog_line+space_between_dialogs))
         print_dialogs_side_by_side(left_response, right_response,
@@ -181,15 +208,17 @@ if __name__ == '__main__':
                 left_dialog_in_one_line = left_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ',' <SOL>').replace('|', '')
                 right_dialog_in_one_line = right_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ', '<SOL>').replace('|', '')
                 
-                data['data'].append({
+                annotated_data['data'].append({
                     'query': query,
                     'sample0': left_dialog_in_one_line,
                     'sample1': right_dialog_in_one_line,
                     'annotator_decision': int(annotator_decision),
                     'decision_duration': decision_duration
                 })
+                # save number of samples you already annotated
+                annotated_data['counter'] = i+1
                 with open(results_filepath, 'w', encoding='utf-8') as outfile:
-                    json.dump(data, outfile)
+                    json.dump(annotated_data, outfile)
                 break
 
             print("Sorry, your input did not match any of "
@@ -201,11 +230,9 @@ if __name__ == '__main__':
 
         if exit_typed:
             break
-        print(len(data))
-        with open(results_filepath, 'w', encoding='utf-8') as outfile:
-            json.dump(data, outfile)
-        print('\nAnnotation finished successfully. \nYou can find your annotation results under: %s'
-              % str(results_filepath))
-        print(f'Use the command {bcolors.OKGREEN}jupyter notebook{bcolors.ENDC} and click analyze_results.ipynb to get summary statistics and visualizations about your annotations.')
+        print(f'\nAnnotation finished successfully. \nYou can find your annotation results under: %s'
+              % str(results_filepath),)
 
+if __name__ == '__main__':
+    annotate()
 
