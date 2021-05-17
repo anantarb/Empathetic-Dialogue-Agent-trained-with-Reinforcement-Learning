@@ -2,7 +2,9 @@ import json
 import random
 import time
 import os
-import sys, getopt
+import sys
+import getopt
+from itertools import repeat
 
 from itertools import combinations
 from pathlib import Path
@@ -15,16 +17,17 @@ class bcolors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
+
 class config:
     size_of_each_dialog_line = 50  # specify printing format
     space_between_dialogs = 10  # specify printing format
-    all_annotators = ['ananta','sophie','vivi','monika']
+    all_annotators = ['ananta', 'sophie', 'vivi', 'monika']
 
 
 def get_formated_annotator_decision(annotator_decision):
     # take random sample if both are equally good (3)
     if annotator_decision == '3':
-        return  ( random.randint(0,1) and '0' or '1')
+        return (random.randint(0, 1) and '0' or '1')
     # take 0 if first (left sample) is better, take 1 if second (right) is better
     if annotator_decision == '1':
         return '0'
@@ -32,32 +35,35 @@ def get_formated_annotator_decision(annotator_decision):
         return '1'
     return annotator_decision
 
+
 def make_lines_of_same_size(text, size):
     text_with_lines_of_same_size = ''
     for line in text.splitlines():
         if len(line) > size:  # line is longer than specified size --> split line in multiple lines of equal length
             for newline_startid in range(0, len(line), size):
                 if newline_startid == 0:  # add first part of line
-                    text_with_lines_of_same_size += (line[newline_startid:newline_startid + size] + '\n')
+                    text_with_lines_of_same_size += (
+                        line[newline_startid:newline_startid + size] + '\n')
                 else:
                     # 1. first line contains speaker id '[1]: ' or '[2]: ' --> add whitespace to other lines '     '
                     # 2. new line might start with whitespace --> remove left whitespace of newline using lstrip()
                     # 3. new line might be smaller than specified size --> fill new line with whitespace using ljust()
-                    text_with_lines_of_same_size += (('     ' + line[newline_startid:newline_startid + size].lstrip())
+                    text_with_lines_of_same_size += ((line[newline_startid:newline_startid + size].lstrip())
                                                      .ljust(size)
                                                      + '\n')
         else:  # line might be smaller than specified size --> fill end of line with whitespace using ljust()
             text_with_lines_of_same_size += (line.ljust(size) + '\n')
     return text_with_lines_of_same_size
 
+
 def format_context(query):
     ret_str = []
     list = query.split('<SOC>')
     for i in range(len(list)):
-        col_line = f"{bcolors.TEXT}" + ((i%2==0) and 'A' or 'B' ) + ': ' + list[i] + f"{bcolors.ENDC}"
+        col_line = f"{bcolors.TEXT}" + \
+            ((i % 2 == 0) and 'A' or 'B') + ': ' + list[i] + f"{bcolors.ENDC}"
         ret_str.append(col_line)
     return "\n".join(ret_str)
-
 
 
 def print_dialogs_side_by_side(a, b, size=50, space=4):
@@ -69,9 +75,27 @@ def print_dialogs_side_by_side(a, b, size=50, space=4):
     b = make_lines_of_same_size(text=b, size=size)
 
     # combine each line of left and right dialog using the separator and print the resulting line
-    lines = [a.splitlines(), b.splitlines()]
+    lines_a = a.splitlines()
+    lines_b = b.splitlines()
+    appending_line = ' '*size
+
+    # fill up the shorter sample
+    if (len(b.splitlines()) > len(a.splitlines())):
+        diff = len(b.splitlines()) - len(a.splitlines())
+        x = a.splitlines()
+        lines_a = x + [appending_line] * diff
+        lines_b = b.splitlines()
+    if (len(a.splitlines()) > len(b.splitlines())):
+        diff = len(a.splitlines()) - len(b.splitlines())
+        x = b.splitlines()
+        lines_b = x + [appending_line] * diff
+        lines_a = a.splitlines()
+
+    lines = [lines_a, lines_b]
+
     for l in zip(*lines):
-        l = map(lambda line_ele: f"{bcolors.TEXT}"+line_ele+f"{bcolors.ENDC}", l)
+        l = map(lambda line_ele: f"{bcolors.TEXT}" +
+                line_ele+f"{bcolors.ENDC}", l)
         print(*l, sep=separator)
 
 
@@ -81,12 +105,16 @@ def create_missing_directories(results_path):
         os.makedirs(results_path)
         print('Results directory successfully created.')
 
-def show_dialog_intro(annotator,i,len, query):
+
+def show_dialog_intro(annotator, i, len, query):
     col_query = format_context(query)
-    state_str = ("Annotator {annotator}: [Sample {current} of {all}]").format(annotator=annotator, current=str(i+1) , all=str(len))
+    state_str = ("Annotator {annotator}: [Sample {current} of {all}]").format(
+        annotator=annotator, current=str(i+1), all=str(len))
     print(f"{bcolors.TEXT}%s{bcolors.ENDC}" % state_str)
-    print((col_query.replace('<SOC>','\n'))+'\n'+'-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
-    print('\nWhich next turn is better?\n' + '-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
+    print((col_query.replace('<SOC>', '\n'))+'\n'+'-' *
+          (2*config.size_of_each_dialog_line+config.space_between_dialogs))
+    print('\nWhich next turn is better?\n' + '-' *
+          (2*config.size_of_each_dialog_line+config.space_between_dialogs))
 
 
 def show_instructions():
@@ -103,20 +131,21 @@ def show_instructions():
           f"\nThe next dialog and response pair will automatically be shown to you after you hit enter.")
 
 
-def annotate(inputfile='', outputfile='',annotator='vivi'):
+def annotate(inputfile='', outputfile='', annotator='vivi'):
     if (annotator not in config.all_annotators):
         annotator = 'vivi'
 
     continue_old_file = True
     if outputfile == '':
         continue_old_file = False
-    print ('Input file is "', inputfile)
-    print ('Continuation of old file named "', outputfile)
+    print('Input file is "', inputfile)
+    print('Continuation of old file named "', outputfile)
 
     # CONFIGURATION
     project_dir = Path(__file__).resolve().parent
     if inputfile == "":
-        data_filepath = project_dir.joinpath('../datasets/datasets/decoded_distributed_query_responses_124M.json')
+        data_filepath = project_dir.joinpath(
+            '../datasets/datasets/decoded_distributed_query_responses_124M.json')
     else:
         data_filepath = project_dir.joinpath(inputfile)
 
@@ -143,7 +172,7 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
             annotated_data = old_file[annotator]
             starting_sample = old_file[annotator+'_counter']
             # get other annotations
-            #for diff_annotator in (ALL_ANNOTATORS-annotator):          
+            # for diff_annotator in (ALL_ANNOTATORS-annotator):
     # setup end
 
     # read dialog data
@@ -157,10 +186,10 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
     for sample in data:
         query = sample['query']
         # choose random order of the two comparisons
-        bool = random.randint(0,1)
-        sample0 = ( bool and sample['sample0'] or sample['sample1'] )
-        sample1 = ( bool and sample['sample1'] or sample['sample0'] )
-        parsed_comparisons.append(({"Q":query,"S0":sample0,"S1":sample1}))
+        bool = random.randint(0, 1)
+        sample0 = (bool and sample['sample0'] or sample['sample1'])
+        sample1 = (bool and sample['sample1'] or sample['sample0'])
+        parsed_comparisons.append(({"Q": query, "S0": sample0, "S1": sample1}))
     print('Done! Parsed %i dialogs' % (len(parsed_comparisons)))
 
     # START INTERACTION
@@ -170,12 +199,13 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
     while True:
         start_or_exit = input(f"\nIf you are ready, type {bcolors.OKGREEN}start{bcolors.ENDC}.\n"
                               f"If you want to quit, type {bcolors.FAIL}exit{bcolors.ENDC}.\n"
-                              f"Output in file %s.\n" 
-                              f"Your input: "% outputfile)
+                              f"Output in file %s.\n"
+                              f"Your input: " % outputfile)
         if start_or_exit == 'exit':
             sys.exit(0)
         if start_or_exit == 'start':
-            print(f'{bcolors.OKGREEN}-{bcolors.ENDC}'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
+            print(f'{bcolors.OKGREEN}-{bcolors.ENDC}' *
+                  (2*config.size_of_each_dialog_line+config.space_between_dialogs))
             break
 
     exit_typed = False
@@ -188,17 +218,18 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
         file[annotator+'_counter'] = 0
 
     # start comparisons
-    for i in range(starting_sample,len(parsed_comparisons)):  # create n comparisons
-        print("This is the dialog history:\n"+'-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
+    for i in range(starting_sample, len(parsed_comparisons)):  # create n comparisons
+        print("This is the dialog history:\n"+'-' *
+              (2*config.size_of_each_dialog_line+config.space_between_dialogs))
 
         query = parsed_comparisons[i]["Q"]
         left_response = parsed_comparisons[i]["S0"]
         right_response = parsed_comparisons[i]["S1"]
 
-        show_dialog_intro(annotator,i,len(parsed_comparisons), query)
+        show_dialog_intro(annotator, i, len(parsed_comparisons), query)
         print_dialogs_side_by_side(left_response, right_response,
-                                size=config.size_of_each_dialog_line,
-                                space=config.space_between_dialogs)
+                                   size=config.size_of_each_dialog_line,
+                                   space=config.space_between_dialogs)
         print('-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
 
         annotator_decision = None
@@ -207,12 +238,12 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
         # start_time = time.time()
         while True:
             annotator_decision = input("\nWhich dialog is better? "
-                                        f"Type {bcolors.OKGREEN}1{bcolors.ENDC} for left, "
-                                        f"{bcolors.OKGREEN}2{bcolors.ENDC} for right, "
-                                        f"{bcolors.OKGREEN}3{bcolors.ENDC} if they are equally good, "
-                                        f"{bcolors.OKGREEN}4{bcolors.ENDC} if they are uncomparable "
-                                        f"(or {bcolors.FAIL}exit{bcolors.ENDC} to stop annotation) and hit enter.\n"
-                                        f"Your input: ")
+                                       f"Type {bcolors.OKGREEN}1{bcolors.ENDC} for left, "
+                                       f"{bcolors.OKGREEN}2{bcolors.ENDC} for right, "
+                                       f"{bcolors.OKGREEN}3{bcolors.ENDC} if they are equally good, "
+                                       f"{bcolors.OKGREEN}4{bcolors.ENDC} if they are uncomparable "
+                                       f"(or {bcolors.FAIL}exit{bcolors.ENDC} to stop annotation) and hit enter.\n"
+                                       f"Your input: ")
 
             if annotator_decision == 'exit':
                 exit_typed = True
@@ -223,46 +254,48 @@ def annotate(inputfile='', outputfile='',annotator='vivi'):
 
                 # replace speaker information with start of line characters in both dialogs and
                 # remove csv delimiter character '|' to prevent bugs
-                left_dialog_in_one_line = left_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ',' <SOL>').replace('|', '')
-                right_dialog_in_one_line = right_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ', '<SOL>').replace('|', '')
-                
+                left_dialog_in_one_line = left_response.replace(
+                    '\n[A]: ', '<SOL>').replace('\n[B]: ', ' <SOL>').replace('|', '')
+                right_dialog_in_one_line = right_response.replace(
+                    '\n[A]: ', '<SOL>').replace('\n[B]: ', '<SOL>').replace('|', '')
+
                 best = get_formated_annotator_decision(annotator_decision)
-                
-                # do not add sample if samples are uncomparable 
+
+                # do not add sample if samples are uncomparable
                 if best != '4':
                     annotated_data.append({
                         'query': query,
                         'sample0': left_dialog_in_one_line,
                         'sample1': right_dialog_in_one_line,
                         'best': int(best),
-                        #'decision_duration': decision_duration
+                        # 'decision_duration': decision_duration
                     })
                     # save number of samples you already annotated
-                    
+
                 if continue_old_file:
                     old_file[annotator+'_counter'] = i+1
-                    old_file[annotator] = annotated_data 
+                    old_file[annotator] = annotated_data
                     with open(results_filepath, 'w', encoding='utf-8') as outfile:
                         json.dump(old_file, outfile)
                 else:
-                    file[annotator] = annotated_data 
+                    file[annotator] = annotated_data
                     file[annotator+'_counter'] = i+1
                     with open(results_filepath, 'w', encoding='utf-8') as outfile:
                         json.dump(file, outfile)
                 break
 
             print("Sorry, your input did not match any of "
-                    f"{bcolors.OKGREEN}1{bcolors.ENDC}, "
-                    f"{bcolors.OKGREEN}2{bcolors.ENDC}, "
-                    f"{bcolors.OKGREEN}3{bcolors.ENDC}, "
-                    f"{bcolors.OKGREEN}4{bcolors.ENDC} or "
-                    f"{bcolors.FAIL}exit{bcolors.ENDC}.")
+                  f"{bcolors.OKGREEN}1{bcolors.ENDC}, "
+                  f"{bcolors.OKGREEN}2{bcolors.ENDC}, "
+                  f"{bcolors.OKGREEN}3{bcolors.ENDC}, "
+                  f"{bcolors.OKGREEN}4{bcolors.ENDC} or "
+                  f"{bcolors.FAIL}exit{bcolors.ENDC}.")
 
         if exit_typed:
             break
         print(f'\nAnnotation finished successfully. \nYou can find your annotation results under: %s'
               % str(results_filepath),)
 
+
 if __name__ == '__main__':
     annotate()
-
