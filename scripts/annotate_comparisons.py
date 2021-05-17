@@ -15,8 +15,22 @@ class bcolors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
+class config:
+    size_of_each_dialog_line = 50  # specify printing format
+    space_between_dialogs = 10  # specify printing format
+    all_annotators = ['ananta','sophie','vivi','monika']
 
 
+def get_formated_annotator_decision(annotator_decision):
+    # take random sample if both are equally good (3)
+    if annotator_decision == '3':
+        return  ( random.randint(0,1) and '0' or '1')
+    # take 0 if first (left sample) is better, take 1 if second (right) is better
+    if annotator_decision == '1':
+        return '0'
+    if annotator_decision == '2':
+        return '1'
+    return annotator_decision
 
 def make_lines_of_same_size(text, size):
     text_with_lines_of_same_size = ''
@@ -67,6 +81,13 @@ def create_missing_directories(results_path):
         os.makedirs(results_path)
         print('Results directory successfully created.')
 
+def show_dialog_intro(annotator,i,len, query):
+    col_query = format_context(query)
+    state_str = ("Annotator {annotator}: [Sample {current} of {all}]").format(annotator=annotator, current=str(i+1) , all=str(len))
+    print(f"{bcolors.TEXT}%s{bcolors.ENDC}" % state_str)
+    print((col_query.replace('<SOC>','\n'))+'\n'+'-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
+    print('\nWhich next turn is better?\n' + '-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
+
 
 def show_instructions():
     print("\nWelcome to the dialog annotation tool!\n"
@@ -82,23 +103,23 @@ def show_instructions():
           f"\nThe next dialog and response pair will automatically be shown to you after you hit enter.")
 
 
-def annotate(inputfile='', outputfile=''):
+def annotate(inputfile='', outputfile='',annotator='vivi'):
+    if (annotator not in config.all_annotators):
+        annotator = 'vivi'
+
     continue_old_file = True
     if outputfile == '':
         continue_old_file = False
     print ('Input file is "', inputfile)
-    print ('Output file is "', outputfile)
+    print ('Continuation of old file named "', outputfile)
 
     # CONFIGURATION
     project_dir = Path(__file__).resolve().parent
     if inputfile == "":
-        data_filepath = project_dir.joinpath('../data/test_comparisons_output.json')
+        data_filepath = project_dir.joinpath('../datasets/datasets/decoded_distributed_query_responses_124M.json')
     else:
         data_filepath = project_dir.joinpath(inputfile)
 
-    num_comparisons_per_dialog_length = 10  # create n comparisons per dialog length
-    size_of_each_dialog_line = 50  # specify printing format
-    space_between_dialogs = 10  # specify printing format
     random.seed(7)
     # CONFIGURATION END
 
@@ -118,20 +139,21 @@ def annotate(inputfile='', outputfile=''):
     if continue_old_file:
         # load data from json file
         with open(results_filepath) as f:
-            annotated_data = json.load(f)
-            starting_sample = annotated_data['counter']
-
-
+            old_file = json.load(f)
+            annotated_data = old_file[annotator]
+            starting_sample = old_file[annotator+'_counter']
+            # get other annotations
+            #for diff_annotator in (ALL_ANNOTATORS-annotator):          
     # setup end
 
     # read dialog data
     with open(data_filepath) as f:
-        data = json.load(f)
+        file = json.load(f)
+        data = file[annotator]
 
     parsed_comparisons = []
 
-    # create a mapping from dialog indices to lengths and scores (ids_per_length)
-    # for selecting desired dialog pairs later
+    # read in dialog
     for sample in data:
         query = sample['query']
         # choose random order of the two comparisons
@@ -139,7 +161,7 @@ def annotate(inputfile='', outputfile=''):
         sample0 = ( bool and sample['sample0'] or sample['sample1'] )
         sample1 = ( bool and sample['sample1'] or sample['sample0'] )
         parsed_comparisons.append(({"Q":query,"S0":sample0,"S1":sample1}))
-        print('Done! Parsed %i dialogs' % (len(parsed_comparisons)))
+    print('Done! Parsed %i dialogs' % (len(parsed_comparisons)))
 
     # START INTERACTION
     # show welcome instructions
@@ -153,40 +175,36 @@ def annotate(inputfile='', outputfile=''):
         if start_or_exit == 'exit':
             sys.exit(0)
         if start_or_exit == 'start':
-            print(f'{bcolors.OKGREEN}-{bcolors.ENDC}'*(2*size_of_each_dialog_line+space_between_dialogs))
+            print(f'{bcolors.OKGREEN}-{bcolors.ENDC}'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
             break
 
     exit_typed = False
 
+    # configure json if we have to create new output file
+    if not continue_old_file:
+        file = {}
+        annotated_data = []
+        file[annotator] = annotated_data
+        file[annotator+'_counter'] = 0
 
     # start comparisons
-    if not continue_old_file:
-        annotated_data = {}
-        annotated_data['data'] = []
-        annotated_data['counter'] = 0
-
     for i in range(starting_sample,len(parsed_comparisons)):  # create n comparisons
-        print("This is the dialog history:\n"+'-'*(2*size_of_each_dialog_line+space_between_dialogs))
+        print("This is the dialog history:\n"+'-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
 
         query = parsed_comparisons[i]["Q"]
         left_response = parsed_comparisons[i]["S0"]
         right_response = parsed_comparisons[i]["S1"]
 
-        col_query = format_context(query)
-
-        state_str = ("[Sample {current} of {all}]").format(current=str(i+1) , all=str(len(parsed_comparisons)))
-        print(f"{bcolors.TEXT}%s{bcolors.ENDC}" % state_str)
-        print((col_query.replace('<SOC>','\n'))+'\n'+'-'*(2*size_of_each_dialog_line+space_between_dialogs))
-        print('\nWhich next turn is better?\n' + '-'*(2*size_of_each_dialog_line+space_between_dialogs))
+        show_dialog_intro(annotator,i,len(parsed_comparisons), query)
         print_dialogs_side_by_side(left_response, right_response,
-                                    size=size_of_each_dialog_line,
-                                    space=space_between_dialogs)
-        print('-'*(2*size_of_each_dialog_line+space_between_dialogs))
+                                size=config.size_of_each_dialog_line,
+                                space=config.space_between_dialogs)
+        print('-'*(2*config.size_of_each_dialog_line+config.space_between_dialogs))
 
         annotator_decision = None
 
         # start timer
-        start_time = time.time()
+        # start_time = time.time()
         while True:
             annotator_decision = input("\nWhich dialog is better? "
                                         f"Type {bcolors.OKGREEN}1{bcolors.ENDC} for left, "
@@ -201,24 +219,36 @@ def annotate(inputfile='', outputfile=''):
                 break
 
             if annotator_decision in ['1', '2', '3', '4']:
-                decision_duration = '%.2f' % (time.time() - start_time)
+                # decision_duration = '%.2f' % (time.time() - start_time)
 
                 # replace speaker information with start of line characters in both dialogs and
                 # remove csv delimiter character '|' to prevent bugs
                 left_dialog_in_one_line = left_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ',' <SOL>').replace('|', '')
                 right_dialog_in_one_line = right_response.replace('\n[A]: ', '<SOL>').replace('\n[B]: ', '<SOL>').replace('|', '')
                 
-                annotated_data['data'].append({
-                    'query': query,
-                    'sample0': left_dialog_in_one_line,
-                    'sample1': right_dialog_in_one_line,
-                    'annotator_decision': int(annotator_decision),
-                    'decision_duration': decision_duration
-                })
-                # save number of samples you already annotated
-                annotated_data['counter'] = i+1
-                with open(results_filepath, 'w', encoding='utf-8') as outfile:
-                    json.dump(annotated_data, outfile)
+                best = get_formated_annotator_decision(annotator_decision)
+                
+                # do not add sample if samples are uncomparable 
+                if best != '4':
+                    annotated_data.append({
+                        'query': query,
+                        'sample0': left_dialog_in_one_line,
+                        'sample1': right_dialog_in_one_line,
+                        'best': int(best),
+                        #'decision_duration': decision_duration
+                    })
+                    # save number of samples you already annotated
+                    
+                if continue_old_file:
+                    old_file[annotator+'_counter'] = i+1
+                    old_file[annotator] = annotated_data 
+                    with open(results_filepath, 'w', encoding='utf-8') as outfile:
+                        json.dump(old_file, outfile)
+                else:
+                    file[annotator] = annotated_data 
+                    file[annotator+'_counter'] = i+1
+                    with open(results_filepath, 'w', encoding='utf-8') as outfile:
+                        json.dump(file, outfile)
                 break
 
             print("Sorry, your input did not match any of "
