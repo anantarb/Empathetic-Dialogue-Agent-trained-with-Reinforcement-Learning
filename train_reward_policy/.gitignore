@@ -120,6 +120,12 @@ venv.bak/
 # mkdocs documentation
 /site
 
+#Datasets
+/datasets
+/checkpoint
+/model_saves
+pickle_fn
+
 # mypy
 .mypy_cache/
 .dmypy.json

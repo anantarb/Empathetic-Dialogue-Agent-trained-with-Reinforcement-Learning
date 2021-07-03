@@ -120,6 +120,11 @@ venv.bak/
 # mkdocs documentation
 /site
 
+#Datasets
+/datasets
+/gpt-2
+/checkpoint
+
 # mypy
 .mypy_cache/
 .dmypy.json

@@ -120,6 +120,9 @@ venv.bak/
 # mkdocs documentation
 /site
 
+#Datasets
+/sampled_responses
+
 # mypy
 .mypy_cache/
 .dmypy.json
