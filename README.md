@@ -22,7 +22,7 @@ The repository structure is as follows:
 
  * Upload the entire folder `nlp-2021-vda` to google drive
 
- * Open notebook of respective directory (`XX/notebooks/`) based on what you want run.
+ * Open notebook of respective directory (`XX/notebooks/`) based on what you want to run.
 
 ## 4 Warning
 
