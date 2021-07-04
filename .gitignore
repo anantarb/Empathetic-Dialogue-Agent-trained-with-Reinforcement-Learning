@@ -128,3 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
+
+/datasets
+/checkpoint
+/evaluate_models/empathy_mental_health/trained_models
+/gpt-2
+/pre-trained-models
+/scripts
+/images
+/data
