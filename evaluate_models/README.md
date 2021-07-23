@@ -9,3 +9,6 @@
 
  * To evaluate our RL fine-tuned (policy-1) on our sampled responses, open `notebooks/01_evaluate_policy-1.ipynb` and run the cells.
  * To evaluate our RL fine-tuned (policy-2) on our sampled responses, open `notebooks/02_evaluate_policy-2.ipynb` and run the cells.
+
+## 4 Human evaluation 
+ * To reproduce the result of our human evaluation, open `notebooks/04_human_evaluation.ipynb` and run the cells. 

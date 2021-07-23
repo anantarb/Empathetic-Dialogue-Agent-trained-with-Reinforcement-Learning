@@ -5,7 +5,7 @@ from lm_human_preferences.utils import core as utils
 
 
 def sample_sequence(*, step, model_hparams, length, batch_size=None, context=None,
-                    temperature=1, top_k=0, top_p=1.0, extra_outputs={}, cond=None):
+                    temperature=1, top_k=20, top_p=1.0, extra_outputs={}, cond=None):
     """
     Sampling from an autoregressive sequence model.
 
