@@ -7,6 +7,8 @@ The repository structure is as follows:
  * `annotate_data/`: It contains code to annotate sampled responses from supervised GPT-2.
  * `train_reward_policy/`: It contains code to train reward model and policy model in an RL setting.
  * `evaluate_models/`: It contains code to evaluate our trained models with respect to different evaluation metrics.
+ * `slides/`: It contains our milestones and final presentation slides.
+ * `report/`: It contains final report of our project.
 
 ## 2 Instructions
 
